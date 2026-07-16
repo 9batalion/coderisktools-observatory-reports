@@ -1,0 +1,56 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:coderisktools:observatory:named-weekly-review:v1",
+  "title": "CodeRiskTools Observatory Named Weekly OSS Review v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema", "week", "period", "projects", "engines", "isolation", "publication", "result", "limitations"],
+  "properties": {
+    "schema": {"const": "coderisktools.observatory.named-weekly-review.v1"},
+    "week": {"type": "string", "pattern": "^[0-9]{4}-W[0-9]{2}$"},
+    "period": {
+      "type": "object", "additionalProperties": false, "required": ["start", "end"],
+      "properties": {"start": {"type": "string", "format": "date"}, "end": {"type": "string", "format": "date"}}
+    },
+    "projects": {
+      "type": "array", "minItems": 3, "maxItems": 3,
+      "items": {
+        "type": "object", "additionalProperties": false,
+        "required": ["name", "url", "license_spdx", "review_status"],
+        "properties": {
+          "name": {"type": "string", "pattern": "^[A-Za-z0-9_.-]{1,39}/[A-Za-z0-9_.-]{1,100}$", "maxLength": 140},
+          "url": {"type": "string", "pattern": "^https://github\\.com/[A-Za-z0-9_.-]{1,39}/[A-Za-z0-9_.-]{1,100}$"},
+          "license_spdx": {"type": "string", "pattern": "^[A-Za-z0-9.+-]{1,100}$", "not": {"enum": ["NONE", "NOASSERTION"]}},
+          "review_status": {"const": "REVIEW_COMPLETED"}
+        }
+      }
+    },
+    "engines": {
+      "type": "object", "additionalProperties": false, "required": ["scanner", "firewall"],
+      "properties": {"scanner": {"enum": ["3.0.0"]}, "firewall": {"enum": ["4.3.0"]}}
+    },
+    "isolation": {
+      "type": "object", "additionalProperties": false, "required": ["worker_network", "target_code_executed"],
+      "properties": {"worker_network": {"const": "NONE"}, "target_code_executed": {"const": false}}
+    },
+    "publication": {
+      "type": "object", "additionalProperties": false,
+      "required": ["project_names", "technical_findings", "exact_results", "project_level_conclusion"],
+      "properties": {
+        "project_names": {"const": "PUBLISHED_FOR_EDITORIAL_INDEXING"},
+        "technical_findings": {"const": "NOT_PUBLISHED"},
+        "exact_results": {"const": "NOT_PUBLISHED"},
+        "project_level_conclusion": {"const": "NONE"}
+      }
+    },
+    "result": {"const": "NAMED_PROJECT_REVIEWS_COMPLETED_NO_PROJECT_LEVEL_SECURITY_CONCLUSION"},
+    "limitations": {
+      "const": [
+        "Project names identify public open-source repositories included in this weekly review index.",
+        "Inclusion does not indicate a vulnerability, endorsement, certification, ranking, or accusation.",
+        "Technical findings, paths, snippets, rules, secrets, and exact results are not published.",
+        "Project names and links are used nominatively to identify the reviewed public repositories."
+      ]
+    }
+  }
+}

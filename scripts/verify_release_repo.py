@@ -2,7 +2,7 @@
 from __future__ import annotations
 
 import argparse
-from datetime import datetime, timezone
+from datetime import date, datetime, timedelta, timezone
 import html
 import hashlib
 import io
@@ -18,6 +18,18 @@ import tarfile
 HEX64=re.compile(r'^[0-9a-f]{64}$')
 ITEM_KEYS={'owner','repository','head_commit','report_revision','observation_id','approval','approval_record_sha256','payload_sha256','bundle_sha256','requested_state'}
 REQUEST_KEYS={'schema','base','branch','publication_items','retractions','public_tree_manifest_path','public_tree_manifest_sha256','public_tree_file_count','attestation'}
+REQUEST_V4_KEYS=REQUEST_KEYS|{'weekly_reports'}
+WEEKLY_BINDING_KEYS={'week','report_sha256','html_sha256'}
+WEEKLY_REPORT_KEYS={'schema','week','period','projects','engines','isolation','publication','result','limitations'}
+WEEKLY_PROJECT_KEYS={'name','url','license_spdx','review_status'}
+WEEKLY_LIMITATIONS=[
+    'Project names identify public open-source repositories included in this weekly review index.',
+    'Inclusion does not indicate a vulnerability, endorsement, certification, ranking, or accusation.',
+    'Technical findings, paths, snippets, rules, secrets, and exact results are not published.',
+    'Project names and links are used nominatively to identify the reviewed public repositories.',
+]
+WEEKLY_SCANNERS={'3.0.0'}
+WEEKLY_FIREWALLS={'4.3.0'}
 APPROVAL_KEYS={'schema','observation_id','approval','repository','source','publication','files','payload_sha256'}
 RETRACTION_KEYS={'schema','observation_id','approval','target','reason_code','retracted_at'}
 RETRACTION_REQUEST_KEYS={'target','approval','reason_code','retracted_at','retraction_record_sha256'}
@@ -121,6 +133,47 @@ def safe_text(value,label):
 def render_html(report):
     title=html.escape(f"CodeRiskTools Report — {report['repository']}");limitations=''.join(f'<li>{html.escape(item)}</li>' for item in report['limitations'])
     return f"<!doctype html><html><head><meta charset=\"utf-8\"><meta http-equiv=\"Content-Security-Policy\" content=\"default-src 'none'; style-src 'self'; img-src 'self'; base-uri 'none'; form-action 'none'\"><title>{title}</title></head><body><h1>{title}</h1><p>Commit: <code>{html.escape(report['head_commit'])}</code></p><p>Scanner: {html.escape(report['scanner_status'])}</p><p>Firewall: {html.escape(report['firewall_status'])}</p><h2>Limitations</h2><ul>{limitations}</ul></body></html>".encode()
+def render_weekly_html(report):
+    week=report['week'];scanner=report['engines']['scanner'];firewall=report['engines']['firewall'];names=[project['name'] for project in report['projects']];joined=', '.join(names);title=f'Open Source Security Review: {joined} — CodeRiskTools Weekly';description=f'CodeRiskTools weekly static review index for {joined}. No project-level vulnerability conclusion or technical findings are published.';projects=''.join(f'<li><a href="{html.escape(project["url"],quote=True)}" rel="noopener noreferrer">{html.escape(project["name"])}</a> — SPDX {html.escape(project["license_spdx"])}, review completed</li>' for project in report['projects']);limitations=''.join(f'<li>{html.escape(item)}</li>' for item in report['limitations'])
+    return f"<!doctype html><html><head><meta charset=\"utf-8\"><meta http-equiv=\"Content-Security-Policy\" content=\"default-src 'none'; style-src 'self'; img-src 'self'; base-uri 'none'; form-action 'none'\"><meta name=\"description\" content=\"{html.escape(description,quote=True)}\"><title>{html.escape(title)}</title></head><body><h1>{html.escape(title)}</h1><p>Week: <code>{week}</code></p><p>CodeRiskTools completed a non-executing static review workflow for the named public open-source repositories below.</p><ul>{projects}</ul><p>Engines: Secret Scanner {scanner}; AI Change Firewall {firewall}.</p><p>Isolation: worker network disabled; target code not executed.</p><p><strong>Inclusion does not mean that a vulnerability was found and is not a security certification or ranking.</strong></p><h2>Publication boundary</h2><p>Technical findings and exact project-level results are not published.</p><h2>Limitations</h2><ul>{limitations}</ul></body></html>".encode()
+def iso_week(value):
+    if type(value) is not str or not re.fullmatch(r'\d{4}-W\d{2}',value):fail('invalid weekly report week')
+    try:start=datetime.strptime(value+'-1','%G-W%V-%u').date()
+    except ValueError as exc:raise VerificationError('invalid weekly report week') from exc
+    if start.strftime('%G-W%V')!=value:fail('non-canonical weekly report week')
+    return start
+def calendar_date(value,label):
+    if type(value) is not str or not re.fullmatch(r'\d{4}-\d{2}-\d{2}',value):fail(f'invalid {label}')
+    try:return date.fromisoformat(value)
+    except ValueError:fail(f'invalid {label}')
+def validate_weekly_report(raw,html_raw,expected_week):
+    if len(raw)>8_192 or len(html_raw)>16_384:fail('oversized weekly artifact')
+    report=exact(strict_json(raw),WEEKLY_REPORT_KEYS,'weekly report')
+    if raw!=canonical(report):fail('weekly report JSON is not canonical')
+    if report['schema']!='coderisktools.observatory.named-weekly-review.v1' or report['week']!=expected_week:fail('weekly review identity mismatch')
+    start=iso_week(report['week']);period=exact(report['period'],{'start','end'},'weekly period')
+    if calendar_date(period['start'],'weekly period start')!=start or calendar_date(period['end'],'weekly period end')!=start+timedelta(days=6):fail('weekly period does not match ISO week')
+    projects=report['projects']
+    if not isinstance(projects,list) or len(projects)!=3:fail('named weekly review requires exactly three projects')
+    names=[]
+    for project in projects:
+        project=exact(project,WEEKLY_PROJECT_KEYS,'weekly project');name=project['name']
+        if type(name) is not str or len(name)>140 or not re.fullmatch(r'[A-Za-z0-9_.-]{1,39}/[A-Za-z0-9_.-]{1,100}',name):fail('invalid weekly project name')
+        if project['url']!=f'https://github.com/{name}':fail('weekly project URL is not exact official repository URL')
+        license_spdx=project['license_spdx']
+        if type(license_spdx) is not str or not re.fullmatch(r'[A-Za-z0-9.+-]{1,100}',license_spdx) or license_spdx in {'NONE','NOASSERTION'}:fail('invalid weekly project SPDX license')
+        if project['review_status']!='REVIEW_COMPLETED':fail('weekly project review is incomplete')
+        names.append(name)
+    if len({name.casefold() for name in names})!=3 or names!=sorted(names,key=str.casefold):fail('weekly projects must be unique and canonically sorted')
+    engines=exact(report['engines'],{'scanner','firewall'},'weekly engines')
+    if engines['scanner'] not in WEEKLY_SCANNERS or engines['firewall'] not in WEEKLY_FIREWALLS:fail('weekly engine version is not allowlisted')
+    isolation=exact(report['isolation'],{'worker_network','target_code_executed'},'weekly isolation')
+    if isolation['worker_network']!='NONE' or isolation['target_code_executed'] is not False:fail('invalid weekly isolation truth')
+    publication=exact(report['publication'],{'project_names','technical_findings','exact_results','project_level_conclusion'},'weekly publication boundary')
+    if publication!={'project_names':'PUBLISHED_FOR_EDITORIAL_INDEXING','technical_findings':'NOT_PUBLISHED','exact_results':'NOT_PUBLISHED','project_level_conclusion':'NONE'}:fail('invalid named weekly publication boundary')
+    if report['result']!='NAMED_PROJECT_REVIEWS_COMPLETED_NO_PROJECT_LEVEL_SECURITY_CONCLUSION' or report['limitations']!=WEEKLY_LIMITATIONS:fail('invalid weekly result or limitations')
+    if html_raw!=render_weekly_html(report):fail('weekly HTML is not exact deterministic rendering')
+    return report
 def validate_history(pairs):
     by_head={};by_repo={};identity_by_id={};identity_by_name={}
     for item,record in pairs:
@@ -178,9 +231,17 @@ def verify(root:Path)->dict:
     for name,expected in declared.items():
         if sha(public_files[name])!=expected:fail(f'public digest mismatch: {name}')
     operator_files=inventory(operator);request_raw=operator_files.pop('pr-request.json',None)
-    if request_raw is None:fail('missing pr-request.json')
-    request=exact(strict_json(request_raw),REQUEST_KEYS,'request')
-    if request['schema']!='coderisktools.observatory.pr-request.v3' or request['base']!='main':fail('unsupported request identity')
+    if request_raw is None:raise VerificationError('missing pr-request.json')
+    request=strict_json(request_raw)
+    if request_raw!=canonical(request):fail('request JSON is not canonical')
+    request_schema=request.get('schema');weekly_reports=[]
+    if request_schema=='coderisktools.observatory.pr-request.v3':
+        exact(request,REQUEST_KEYS,'request')
+    elif request_schema=='coderisktools.observatory.pr-request.v4':
+        exact(request,REQUEST_V4_KEYS,'request');weekly_reports=request['weekly_reports']
+        if not isinstance(weekly_reports,list) or not weekly_reports or len(weekly_reports)>520:fail('invalid weekly request array')
+    else:fail('unsupported request identity')
+    if request['base']!='main':fail('unsupported request base')
     if request['public_tree_manifest_path']!='SHA256SUMS.txt' or request['public_tree_manifest_sha256']!=sha(manifest) or request['public_tree_file_count']!=len(public_files):fail('public tree request binding mismatch')
     if request['attestation']!='NOT_GENERATED_REQUIRES_PROTECTED_OIDC_WORKFLOW':fail('invalid pre-attestation state')
     items=request['publication_items'];withdrawals=request['retractions']
@@ -260,6 +321,22 @@ def verify(root:Path)->dict:
         else:
             key=current[(owner,repository)][1];prefix=f'reports/github/{owner}/{repository}/{key[2]}/r{key[3]}/';firewall=strict_json(public_files[prefix+'firewall-decision.json']);label='Reviewed' if firewall.get('status') in {'FIREWALL_ALLOW','FIREWALL_SIMULATION_ALLOW'} else 'Report available'
         if public_files.get(badge_name)!=badge(label):fail('badge semantic mismatch')
+    weekly_entries=[];previous_week=''
+    if weekly_reports:
+        newest_binding=weekly_reports[-1]
+        if not isinstance(newest_binding,dict) or request['branch']!=f"weekly/{newest_binding.get('week')}":fail('weekly request branch is not bound to newest week')
+    for binding in weekly_reports:
+        exact(binding,WEEKLY_BINDING_KEYS,'weekly binding');week=binding['week'];iso_week(week)
+        if previous_week and week<=previous_week:fail('weekly bindings must be unique and sorted')
+        previous_week=week
+        report_name=f'weekly/{week}/report.json';html_name=f'weekly/{week}/index.html';report_raw=public_files.get(report_name);html_raw=public_files.get(html_name)
+        if report_raw is None or html_raw is None:raise VerificationError('weekly public artifact missing')
+        if sha(report_raw)!=hex64(binding['report_sha256'],'weekly report digest') or sha(html_raw)!=hex64(binding['html_sha256'],'weekly HTML digest'):fail('weekly public digest mismatch')
+        validate_weekly_report(report_raw,html_raw,week);expected_public.update({report_name,html_name});weekly_entries.append({'week':week,'report_path':f'/weekly/{week}/'})
+    if weekly_entries:
+        weekly_entries.reverse();index_name='weekly/index.json';latest_name='weekly/latest.json';expected_public.update({index_name,latest_name})
+        if public_files.get(index_name)!=canonical({'schema':'coderisktools.observatory.named-weekly-index.v1','reports':weekly_entries}):fail('weekly index semantic mismatch')
+        if public_files.get(latest_name)!=canonical(weekly_entries[0]):fail('weekly latest semantic mismatch')
     if set(public_files)!=expected_public:fail('public tree contains unbound semantic artifacts')
     for name,data in public_files.items():
         if not name.endswith('.tar.gz') and (any(pattern.search(data) for pattern in PRIVATE) or b'<script' in data.lower() or b'javascript:' in data.lower()):fail(f'public leakage or active content: {name}')

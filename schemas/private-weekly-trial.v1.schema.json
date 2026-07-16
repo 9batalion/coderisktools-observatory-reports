@@ -1,0 +1,19 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:coderisktools:observatory:private-weekly-trial:v1",
+  "title": "Private Weekly Trial Input v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema", "repository", "stars", "license_spdx", "status", "scanner_version", "firewall_version", "worker_network", "target_code_executed"],
+  "properties": {
+    "schema": {"const": "coderisktools.observatory.private-weekly-trial.v1"},
+    "repository": {"type": "string", "pattern": "^[A-Za-z0-9_.-]{1,100}/[A-Za-z0-9_.-]{1,100}$"},
+    "stars": {"type": "integer", "minimum": 10000},
+    "license_spdx": {"type": "string", "pattern": "^[A-Za-z0-9.+-]{1,100}$", "not": {"enum": ["NONE", "NOASSERTION"]}},
+    "status": {"const": "COMPLETE"},
+    "scanner_version": {"enum": ["3.0.0"]},
+    "firewall_version": {"enum": ["4.3.0"]},
+    "worker_network": {"const": "NONE"},
+    "target_code_executed": {"const": false}
+  }
+}
