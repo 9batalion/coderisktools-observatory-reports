@@ -161,7 +161,19 @@ class ReleaseRepoTests(unittest.TestCase):
         text=(ROOT/'.github/workflows/deploy-pages.yml').read_text();self.assertIn('branches: [main]',text);self.assertNotIn('workflow_dispatch',text);self.assertIn('environment:',text);self.assertIn('name: github-pages',text);self.assertIn('pages: write',text);self.assertIn('id-token: write',text);self.assertIn('attestations: write',text);self.assertIn('subject-path: public/SHA256SUMS.txt',text);self.assertLess(text.index('attest-build-provenance@'),text.index('deploy-pages@'))
     def test_deploy_permissions_are_job_scoped_least_privilege(self):
         text=(ROOT/'.github/workflows/deploy-pages.yml').read_text();before_jobs,verify_part=text.split('jobs:',1);verify_part,deploy_part=verify_part.split('\n  deploy:',1);self.assertNotIn('permissions:',before_jobs);self.assertIn('contents: read',verify_part);self.assertIn('attestations: write',verify_part);self.assertIn('id-token: write',verify_part);self.assertNotIn('pages: write',verify_part);self.assertIn('pages: write',deploy_part);self.assertIn('id-token: write',deploy_part);self.assertNotIn('attestations: write',deploy_part);self.assertNotIn('contents: read',deploy_part)
-    def test_governance_requires_reviews_codeowners_and_no_direct_push(self):
-        policy=json.loads((ROOT/'governance/repository-policy.json').read_text());self.assertTrue(policy['branch_protection']['required_pull_request_reviews']);self.assertGreaterEqual(policy['branch_protection']['required_approving_review_count'],1);self.assertTrue(policy['branch_protection']['enforce_admins']);self.assertFalse(policy['publisher_identity']['can_push_main']);self.assertFalse(policy['publisher_identity']['can_modify_engine_repository']);self.assertTrue((ROOT/'.github/CODEOWNERS').read_text().strip())
+    def test_governance_matches_solo_maintainer_pr_and_ci_gates(self):
+        policy=json.loads((ROOT/'governance/repository-policy.json').read_text())
+        branch=policy['branch_protection'];submission=policy['report_submission'];pages=policy['pages_environment']
+        self.assertEqual(policy['operating_mode'],'SOLO_MAINTAINER')
+        self.assertTrue(branch['required_pull_request']);self.assertEqual(branch['required_approving_review_count'],0)
+        self.assertFalse(branch['require_code_owner_reviews']);self.assertFalse(branch['require_last_push_approval'])
+        self.assertEqual(branch['required_status_checks'],[{'context':'validate','app_id':15368}])
+        self.assertTrue(branch['strict_status_checks']);self.assertTrue(branch['enforce_admins'])
+        self.assertFalse(branch['allow_force_pushes']);self.assertFalse(branch['allow_deletions'])
+        self.assertFalse(submission['direct_main_push']);self.assertFalse(submission['human_second_account_required'])
+        self.assertTrue(submission['trusted_base_verifier_required'])
+        self.assertEqual(pages['required_reviewers'],0);self.assertFalse(pages['prevent_self_review'])
+        self.assertFalse(pages['can_admins_bypass']);self.assertTrue(pages['protected_branches_only'])
+        self.assertIn('@9batalion',(ROOT/'.github/CODEOWNERS').read_text())
 
 if __name__=='__main__':unittest.main()

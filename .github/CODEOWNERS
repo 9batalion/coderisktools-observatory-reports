@@ -1,5 +1,5 @@
-# Replace these placeholders with the dedicated publisher-review team before remote setup.
-* @coderisktools-publisher-reviewers
-/.github/ @coderisktools-security-reviewers
-/scripts/ @coderisktools-security-reviewers
-/governance/ @coderisktools-security-reviewers
+# Ownership metadata for the solo-maintainer repository.
+* @9batalion
+/.github/ @9batalion
+/scripts/ @9batalion
+/governance/ @9batalion
