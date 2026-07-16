@@ -1,0 +1,49 @@
+name: Deploy verified reports to Pages
+
+on:
+  push:
+    branches: [main]
+
+concurrency:
+  group: github-pages
+  cancel-in-progress: false
+
+jobs:
+  verify-and-upload:
+    permissions:
+      contents: read
+      id-token: write
+      attestations: write
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Checkout exact main commit
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7
+        with:
+          persist-credentials: false
+      - name: Verify complete publication and approval bindings
+        run: python3 scripts/verify_release_repo.py --root .
+      - name: Configure Pages
+        uses: actions/configure-pages@983d7736d9b0ae728b81ab479565c72886d7745b # v5
+      - name: Attest complete public-tree manifest
+        id: attestation
+        uses: actions/attest-build-provenance@977bb373ede98d70efdf65b84cb5f73e068dcc2a # v3
+        with:
+          subject-path: public/SHA256SUMS.txt
+      - name: Upload verified Pages artifact
+        uses: actions/upload-pages-artifact@fc324d3547104276b827a68afc52ff2a11cc49c9 # v5
+        with:
+          path: public
+
+  deploy:
+    needs: verify-and-upload
+    permissions:
+      pages: write
+      id-token: write
+    runs-on: ubuntu-24.04
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - name: Deploy Pages artifact
+        id: deployment
+        uses: actions/deploy-pages@d6db90164ac5ed86f2b6aed7e0febac5b3c0c03e # v4

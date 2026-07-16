@@ -1,0 +1,40 @@
+name: Validate publication
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - "public/**"
+      - "operator/**"
+      - "scripts/**"
+      - ".github/**"
+      - "governance/**"
+
+permissions:
+  contents: read
+
+jobs:
+  validate:
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Checkout candidate merge state
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7
+        with:
+          persist-credentials: false
+          fetch-depth: 2
+          path: candidate
+      - name: Checkout trusted verifier from exact base
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7
+        with:
+          persist-credentials: false
+          ref: ${{ github.event.pull_request.base.sha }}
+          path: trusted
+      - name: Restrict report PR to publication payload paths
+        env:
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+        run: |
+          git -C candidate cat-file -e "$BASE_SHA^{commit}"
+          git -C candidate diff --no-renames --name-only --diff-filter=ACDMRTUXB "$BASE_SHA" HEAD > /tmp/changed-paths.txt
+          python3 trusted/scripts/verify_changed_paths.py /tmp/changed-paths.txt
+      - name: Verify complete publication and approval bindings
+        run: python3 trusted/scripts/verify_release_repo.py --root candidate

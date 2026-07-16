@@ -1,0 +1,45 @@
+{
+  "schema": "coderisktools.observatory.reports-repository-policy.v1",
+  "repository": {
+    "visibility": "public",
+    "default_branch": "main",
+    "pages_source": "github_actions"
+  },
+  "branch_protection": {
+    "required_pull_request_reviews": true,
+    "required_approving_review_count": 1,
+    "dismiss_stale_reviews": true,
+    "require_code_owner_reviews": true,
+    "required_status_checks": ["validate"],
+    "strict_status_checks": true,
+    "enforce_admins": true,
+    "allow_force_pushes": false,
+    "allow_deletions": false
+  },
+  "publisher_identity": {
+    "type": "dedicated_github_app_or_machine_user",
+    "can_open_report_pull_requests": true,
+    "can_push_main": false,
+    "can_approve_own_pull_request": false,
+    "can_modify_engine_repository": false,
+    "can_modify_scanner_or_firewall": false
+  },
+  "pages_environment": {
+    "name": "github-pages",
+    "required_reviewers": 1,
+    "prevent_self_review": true
+  },
+  "attestation": {
+    "subject": "public/SHA256SUMS.txt",
+    "meaning": "OIDC provenance for the exact complete-tree manifest; the manifest closes every deployed public byte",
+    "required_before_deploy": true
+  },
+  "action_pins": {
+    "actions/checkout": "9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0",
+    "actions/configure-pages": "983d7736d9b0ae728b81ab479565c72886d7745b",
+    "actions/attest-build-provenance": "977bb373ede98d70efdf65b84cb5f73e068dcc2a",
+    "actions/upload-pages-artifact": "fc324d3547104276b827a68afc52ff2a11cc49c9",
+    "actions/deploy-pages": "d6db90164ac5ed86f2b6aed7e0febac5b3c0c03e"
+  },
+  "remote_state": "NOT_APPLIED"
+}

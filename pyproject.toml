@@ -1,0 +1,10 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "coderisktools-observatory-github-next"
+version = "0.1.2"
+description = "Local-only Reports repository workflow and governance candidate"
+requires-python = ">=3.11"
+dependencies = []
