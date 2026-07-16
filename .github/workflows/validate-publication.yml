@@ -17,11 +17,12 @@ jobs:
   validate:
     runs-on: ubuntu-24.04
     steps:
-      - name: Checkout candidate merge state
+      - name: Checkout exact candidate head state
         uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7
         with:
           persist-credentials: false
-          fetch-depth: 2
+          ref: ${{ github.event.pull_request.head.sha }}
+          fetch-depth: 0
           path: candidate
       - name: Checkout trusted verifier from exact base
         uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7
@@ -36,5 +37,21 @@ jobs:
           git -C candidate cat-file -e "$BASE_SHA^{commit}"
           git -C candidate diff --no-renames --name-only --diff-filter=ACDMRTUXB "$BASE_SHA" HEAD > /tmp/changed-paths.txt
           python3 trusted/scripts/verify_changed_paths.py /tmp/changed-paths.txt
+      - name: Enforce named weekly PR metadata from trusted base
+        env:
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          PR_TITLE: ${{ github.event.pull_request.title }}
+          PR_BODY: ${{ github.event.pull_request.body }}
+          HEAD_REF: ${{ github.event.pull_request.head.ref }}
+          PR_AUTHOR: ${{ github.event.pull_request.user.login }}
+          PR_DRAFT: ${{ toJSON(github.event.pull_request.draft) }}
+          PR_LABELS: ${{ toJSON(github.event.pull_request.labels) }}
+          PR_ASSIGNEES: ${{ toJSON(github.event.pull_request.assignees) }}
+          PR_REVIEWERS: ${{ toJSON(github.event.pull_request.requested_reviewers) }}
+          PR_TEAMS: ${{ toJSON(github.event.pull_request.requested_teams) }}
+          PR_MILESTONE: ${{ toJSON(github.event.pull_request.milestone) }}
+        run: python3 trusted/scripts/verify_weekly_pr_metadata.py --candidate candidate --paths /tmp/changed-paths.txt
+      - name: Enforce immutable named weekly history from trusted base
+        run: python3 trusted/scripts/verify_weekly_immutability.py --base trusted --candidate candidate --paths /tmp/changed-paths.txt
       - name: Verify complete publication and approval bindings
         run: python3 trusted/scripts/verify_release_repo.py --root candidate

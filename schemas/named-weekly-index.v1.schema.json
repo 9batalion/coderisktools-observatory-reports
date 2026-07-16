@@ -1,0 +1,21 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:coderisktools:observatory:named-weekly-index:v1",
+  "title": "Named Weekly OSS Review Index v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema", "reports"],
+  "properties": {
+    "schema": {"const": "coderisktools.observatory.named-weekly-index.v1"},
+    "reports": {
+      "type": "array", "minItems": 1, "maxItems": 520, "uniqueItems": true,
+      "items": {
+        "type": "object", "additionalProperties": false, "required": ["week", "report_path"],
+        "properties": {
+          "week": {"type": "string", "pattern": "^[0-9]{4}-W[0-9]{2}$"},
+          "report_path": {"type": "string", "pattern": "^/weekly/[0-9]{4}-W[0-9]{2}/$"}
+        }
+      }
+    }
+  }
+}

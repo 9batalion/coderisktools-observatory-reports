@@ -25,6 +25,16 @@
     "human_second_account_required": false,
     "trusted_base_verifier_required": true
   },
+  "security_pack_maintenance": {
+    "mode": "CONTROLLED_ADMIN_BOOTSTRAP",
+    "report_gate_applicable": false,
+    "exact_change_allowlist_required": true,
+    "protected_payload_roots_unchanged": ["public", "operator"],
+    "independent_pass_required": "B0/H0/M0",
+    "temporary_control_change": "REQUIRED_STATUS_CHECK_ONLY",
+    "restore_strict_validate_immediately": true,
+    "synthetic_weekly_rehearsal_required_before_real_publication": true
+  },
   "pages_environment": {
     "name": "github-pages",
     "required_reviewers": 0,
