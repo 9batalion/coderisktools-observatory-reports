@@ -47,12 +47,11 @@ def main(argv=None):
         if subject!=expected_title or commit_body:fail('weekly commit subject/body is not exact')
         identity=tuple(git(candidate,'log','-1','--format=%an%x00%ae%x00%cn%x00%ce').decode().rstrip('\n').split('\0'))
         if identity!=IDENTITY:fail('weekly commit identity is not exact')
-        start=datetime.strptime(week+'-1','%G-W%V-%u').date();expected_time=start.isoformat()+'T08:00:00+00:00'
-        times=git(candidate,'log','-1','--format=%aI%x00%cI').decode().rstrip('\n').split('\0')
-        if times!=[expected_time,expected_time]:fail('weekly commit timestamp is not deterministic')
+        start=datetime.strptime(week+'-1','%G-W%V-%u').date();epoch=str(int(datetime(start.year,start.month,start.day,8,tzinfo=timezone.utc).timestamp()))
+        times=git(candidate,'log','-1','--format=%at%x00%ct').decode().rstrip('\n').split('\0')
+        if times!=[epoch,epoch]:fail('weekly commit timestamp is not deterministic')
         tree=git(candidate,'rev-parse','HEAD^{tree}').decode().strip()
         if not re.fullmatch(r'[0-9a-f]{40}',tree):fail('invalid weekly commit tree')
-        epoch=str(int(datetime(start.year,start.month,start.day,8,tzinfo=timezone.utc).timestamp()))
         identity_line=f'9batalion <38577463+9batalion@users.noreply.github.com> {epoch} +0000'
         expected_commit=(f'tree {tree}\nparent {base}\nauthor {identity_line}\ncommitter {identity_line}\n\n{expected_title}\n').encode()
         if git(candidate,'cat-file','commit','HEAD')!=expected_commit:fail('weekly raw commit object is not canonical')
