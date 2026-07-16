@@ -1,23 +1,26 @@
-# Reports repository bootstrap — not applied
+# Reports repository bootstrap — applied in solo-maintainer mode
 
-Perform only after explicit authorization and replacement of all placeholders.
+Target: `9batalion/coderisktools-observatory-reports`.
 
-1. Create a separate public Reports repository. Do not grant its publisher App access to the scanner/firewall repository.
-2. Commit this workflow/governance pack to `main` through an administrator-controlled bootstrap.
-3. Replace placeholder CODEOWNERS teams with real reviewer teams.
-4. Enable GitHub Pages with source `GitHub Actions`.
-5. Protect `main`:
-   - PR required;
-   - at least one approval;
-   - code-owner review;
-   - stale-review dismissal;
-   - strict `validate` check;
-   - admins included;
-   - no force pushes or deletion.
-6. Protect environment `github-pages` with at least one reviewer and prevent self-review.
-7. Install a dedicated publisher App/machine identity with the minimum ability to create report branches/PRs, no direct-main push and no engine-repository installation.
-8. Keep workflow/verifier/governance changes outside report PRs. The report changed-path gate intentionally rejects them; security-pack upgrades require a separately authorized administrator process.
-9. Run one synthetic PR and verify: trusted-base verifier, changed-path gate, no operator files in Pages artifact, manifest attestation before deployment, and Pages URL readback.
-10. Only then consider one explicitly opt-in real report.
+## Applied controls
 
-Current state is `NOT_APPLIED`. No remote target, team or identity has been selected.
+1. Separate public Reports repository; scanner/firewall engine access is not granted.
+2. Audited workflow/governance pack bootstrapped to `main` through an administrator-controlled initial commit.
+3. GitHub Pages source is GitHub Actions.
+4. `main` requires a PR and strict `validate` check bound to GitHub Actions App ID `15368`.
+5. Human approval and a second account are intentionally not required in this solo-maintainer project.
+6. Administrators remain subject to branch protection; force pushes and branch deletion are disabled.
+7. The `github-pages` environment accepts only protected branches and has `can_admins_bypass=false`; no human deployment reviewer is required.
+8. Report PRs may modify only `public/` and `operator/`. Workflow/verifier/governance upgrades use a separately controlled administrative maintenance process.
+9. The synthetic PR passed trusted-base verification, changed-path validation, manifest attestation, Pages deployment, full 20-file public read-back, and `operator/` exclusion.
+10. Real reports remain opt-in and are not part of the synthetic bootstrap.
+
+## Current evidence
+
+- Synthetic PR: `#1`.
+- Merge commit: `2a406aeb2585eed8d65ad949b0fcf664980c1294`.
+- Deploy run: `29511311554`.
+- Public manifest: `e1ac3f4260a5b76751c555ac76ea2e9307c5fa69cf0ccef9ebc63a79903fa78b`.
+- Public files: 20/20 verified.
+- `operator/pr-request.json` public read-back: HTTP 404.
+- Real reports: none.

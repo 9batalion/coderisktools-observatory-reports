@@ -1,36 +1,46 @@
 {
-  "schema": "coderisktools.observatory.reports-repository-policy.v1",
+  "schema": "coderisktools.observatory.reports-repository-policy.v2",
+  "operating_mode": "SOLO_MAINTAINER",
   "repository": {
     "visibility": "public",
     "default_branch": "main",
     "pages_source": "github_actions"
   },
   "branch_protection": {
-    "required_pull_request_reviews": true,
-    "required_approving_review_count": 1,
-    "dismiss_stale_reviews": true,
-    "require_code_owner_reviews": true,
-    "required_status_checks": ["validate"],
+    "required_pull_request": true,
+    "required_approving_review_count": 0,
+    "require_code_owner_reviews": false,
+    "require_last_push_approval": false,
+    "required_status_checks": [{"context": "validate", "app_id": 15368}],
     "strict_status_checks": true,
     "enforce_admins": true,
+    "required_linear_history": true,
+    "required_conversation_resolution": true,
     "allow_force_pushes": false,
     "allow_deletions": false
   },
-  "publisher_identity": {
-    "type": "dedicated_github_app_or_machine_user",
-    "can_open_report_pull_requests": true,
-    "can_push_main": false,
-    "can_approve_own_pull_request": false,
-    "can_modify_engine_repository": false,
-    "can_modify_scanner_or_firewall": false
+  "report_submission": {
+    "allowed_changed_roots": ["public", "operator"],
+    "direct_main_push": false,
+    "human_second_account_required": false,
+    "trusted_base_verifier_required": true
   },
   "pages_environment": {
     "name": "github-pages",
-    "required_reviewers": 1,
-    "prevent_self_review": true
+    "required_reviewers": 0,
+    "prevent_self_review": false,
+    "can_admins_bypass": false,
+    "protected_branches_only": true
+  },
+  "workflow_permissions": {
+    "default": "read",
+    "can_approve_pull_request_reviews": false,
+    "allowed_actions": "github_owned_only",
+    "full_sha_pinning_required_by_repository_pack": true
   },
   "attestation": {
     "subject": "public/SHA256SUMS.txt",
+    "predicate_type": "https://slsa.dev/provenance/v1",
     "meaning": "OIDC provenance for the exact complete-tree manifest; the manifest closes every deployed public byte",
     "required_before_deploy": true
   },
@@ -41,5 +51,5 @@
     "actions/upload-pages-artifact": "fc324d3547104276b827a68afc52ff2a11cc49c9",
     "actions/deploy-pages": "d6db90164ac5ed86f2b6aed7e0febac5b3c0c03e"
   },
-  "remote_state": "NOT_APPLIED"
+  "remote_state": "APPLIED_SOLO_MAINTAINER_SYNTHETIC_ONLY"
 }
