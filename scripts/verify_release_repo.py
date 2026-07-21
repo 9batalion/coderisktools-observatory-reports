@@ -247,6 +247,27 @@ def verify(root:Path)->dict:
     items=request['publication_items'];withdrawals=request['retractions']
     if not isinstance(items,list) or not items or not isinstance(withdrawals,list):fail('invalid request arrays')
     expected_operator=set();item_by_key={};record_by_key={};history_pairs=[];expected_public={'feeds/reports.json','feeds/reports.xml'}
+    status_names={'status/status.json','status/index.html'}
+    status_present=status_names & set(public_files)
+    if status_present and status_present != status_names:fail('status artifact pair is incomplete')
+    if status_present:
+        expected_public.update(status_names)
+        status_payload=strict_json(public_files['status/status.json'])
+        exact(status_payload,{'schema_version','generated_at','last_build_sha','last_publication','publication_scope','counts','feeds','self_scan','benchmark'},'status')
+        if status_payload['schema_version']!='1.0' or status_payload['publication_scope'] not in {'empty','synthetic','real','mixed'}:fail('invalid status identity')
+        if not isinstance(status_payload['generated_at'],str) or not re.fullmatch(r'\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}Z',status_payload['generated_at']):fail('invalid status timestamp')
+        if not isinstance(status_payload['last_build_sha'],str) or not re.fullmatch(r'[0-9a-f]{40}',status_payload['last_build_sha']):fail('invalid status build SHA')
+        counts=exact(status_payload['counts'],{'reports','digests','retractions','partial_scans'},'status counts')
+        if any(type(value) is not int or value<0 for value in counts.values()):fail('invalid status counts')
+        feeds=exact(status_payload['feeds'],{'status'},'status feeds')
+        if feeds['status'] not in {'healthy','degraded','unknown'}:fail('invalid status feed')
+        self_scan=exact(status_payload['self_scan'],{'decision','finding_count'},'status self-scan')
+        if self_scan['decision'] not in {'PUBLISH','HOLD','REJECT'} or type(self_scan['finding_count']) is not int or self_scan['finding_count']<0:fail('invalid status self-scan')
+        benchmark=exact(status_payload['benchmark'],{'passed'},'status benchmark')
+        if type(benchmark['passed']) is not bool:fail('invalid status benchmark')
+        if status_payload['last_publication'] is not None and not isinstance(status_payload['last_publication'],str):fail('invalid status publication timestamp')
+        if b'Content-Security-Policy' not in public_files['status/index.html']:fail('status HTML lacks CSP')
+
     for item in items:
         exact(item,ITEM_KEYS,'publication item');owner=safe_component(item['owner'],'owner');repository=safe_component(item['repository'],'repository');head=item['head_commit']
         if not isinstance(head,str) or not re.fullmatch(r'[0-9a-f]{40}',head):fail('head commit must be full lowercase SHA-1')
