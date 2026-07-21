@@ -1,7 +1,7 @@
 {
   "schema": "coderisktools.observatory.weekly-next-state.v1",
-  "version": "0.2.0",
-  "status": "LOCAL_WEEKLY_IMPLEMENTATION_PASS_PENDING_ADVERSARIAL_AUDIT",
+  "version": "0.3.0",
+  "status": "RANKING_CONTRACT_IMPLEMENTATION_PASS_PENDING_CONTROLLED_PROMOTION",
   "baseline_remote_main": "13039d40eee608605d44b25229cad8dce9cfeaa9",
   "named_weekly_schema": "coderisktools.observatory.named-weekly-review.v1",
   "projects_per_week": 3,
