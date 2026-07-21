@@ -1,0 +1,23 @@
+{
+  "benchmark": {
+    "passed": true
+  },
+  "counts": {
+    "digests": 1,
+    "partial_scans": 0,
+    "reports": 2,
+    "retractions": 1
+  },
+  "feeds": {
+    "status": "healthy"
+  },
+  "generated_at": "2026-07-21T09:21:51Z",
+  "last_build_sha": "0987ff12e27444b7cce1842b41d1086a2e9d9a9e",
+  "last_publication": null,
+  "publication_scope": "synthetic",
+  "schema_version": "1.0",
+  "self_scan": {
+    "decision": "PUBLISH",
+    "finding_count": 0
+  }
+}

@@ -10,7 +10,7 @@ Public Reports repository for CodeRiskTools Observatory, operated in **solo-main
 - Exact local source-inventory manifest: `0b5e5dd21533c8ef0c69345b0dc75455b94716ac50162369e431aff898d3cb33` (the remote repository is a deployment projection, not that inventory).
 - Synthetic publication set: deployed from PR #1.
 - Real reports published: **none**.
-- Public-tree manifest: `e1ac3f4260a5b76751c555ac76ea2e9307c5fa69cf0ccef9ebc63a79903fa78b`.
+- Public-tree manifest: `2fe29a5b9a3d797af4f6573a3f1587ad4f5f81b09d83a10f9965332e5599717a`.
 - Pages: https://9batalion.github.io/coderisktools-observatory-reports/
 
 ## Solo-maintainer control model
