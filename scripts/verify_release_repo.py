@@ -19,6 +19,20 @@ HEX64=re.compile(r'^[0-9a-f]{64}$')
 ITEM_KEYS={'owner','repository','head_commit','report_revision','observation_id','approval','approval_record_sha256','payload_sha256','bundle_sha256','requested_state'}
 REQUEST_KEYS={'schema','base','branch','publication_items','retractions','public_tree_manifest_path','public_tree_manifest_sha256','public_tree_file_count','attestation'}
 REQUEST_V4_KEYS=REQUEST_KEYS|{'weekly_reports'}
+REQUEST_V5_KEYS=REQUEST_V4_KEYS|{'ranking_reports'}
+RANKING_BINDING_KEYS={'week','report_sha256','html_sha256'}
+RANKING_KEYS={'schema','week','cohort','provenance','publication','entries','limitations'}
+RANKING_COHORT_KEYS={'schema','metric','snapshot_at','tie_break','size'}
+RANKING_PROVENANCE_KEYS={'scanner_version','scanner_source_commit','ruleset_digest'}
+RANKING_PUBLICATION_KEYS={'purpose','security_ranking','raw_findings','firewall_results'}
+RANKING_ENTRY_KEYS={'rank','repository','repository_url','head_sha','stars','license_spdx','scan_status','publication_status'}
+RANKING_SCAN_STATUSES={'complete','partial'}
+RANKING_PUBLICATION_STATUSES={'NOT_PUBLISHED'}
+RANKING_LIMITATIONS=[
+    'This is a popularity cohort and scan-coverage index, not a security ranking.',
+    'Partial or failed scans are not interpreted as clean or vulnerable.',
+    'Raw findings, paths, snippets, secrets, scores, grades, and firewall results are not published.',
+]
 WEEKLY_BINDING_KEYS={'week','report_sha256','html_sha256'}
 WEEKLY_REPORT_KEYS={'schema','week','period','projects','engines','isolation','publication','result','limitations'}
 WEEKLY_PROJECT_KEYS={'name','url','license_spdx','review_status'}
@@ -146,6 +160,42 @@ def calendar_date(value,label):
     if type(value) is not str or not re.fullmatch(r'\d{4}-\d{2}-\d{2}',value):fail(f'invalid {label}')
     try:return date.fromisoformat(value)
     except ValueError:fail(f'invalid {label}')
+def render_ranking_html(report):
+    entries=''.join(f'<li><strong>#{entry["rank"]}</strong> <a href="{html.escape(entry["repository_url"],quote=True)}" rel="noopener noreferrer">{html.escape(entry["repository"])}</a> — {entry["stars"]} stars — scan {entry["scan_status"]}</li>' for entry in report['entries'])
+    limitations=''.join(f'<li>{html.escape(item)}</li>' for item in report['limitations'])
+    return f"<!doctype html><html><head><meta charset=\"utf-8\"><meta http-equiv=\"Content-Security-Policy\" content=\"default-src 'none'; style-src 'self'; img-src 'self'; base-uri 'none'; form-action 'none'\"><meta name=\"description\" content=\"Popularity cohort and scan coverage index; not a security ranking.\"><title>CodeRiskTools Popularity Cohort — {report['week']}</title></head><body><h1>CodeRiskTools Popularity Cohort — {report['week']}</h1><p>This is a popularity cohort and scan-coverage index, not a security ranking.</p><ol>{entries}</ol><h2>Limitations</h2><ul>{limitations}</ul></body></html>".encode()
+
+def validate_ranking_report(raw,html_raw):
+    if len(raw)>1_000_000 or len(html_raw)>2_000_000:fail('oversized ranking artifact')
+    report=exact(strict_json(raw),RANKING_KEYS,'ranking report')
+    if raw!=canonical(report):fail('ranking report JSON is not canonical')
+    if report['schema']!='coderisktools.observatory.popularity-ranking.v1':fail('ranking schema identity mismatch')
+    week=iso_week(report['week'])
+    cohort=exact(report['cohort'],RANKING_COHORT_KEYS,'ranking cohort')
+    if cohort['schema']!='coderisktools.public-popularity-cohort.v1' or cohort['metric']!='stargazers_count' or cohort['tie_break']!='repository lexicographic ascending' or cohort['size']!=15:fail('invalid ranking cohort')
+    utc(cohort['snapshot_at'],'ranking snapshot')
+    provenance=exact(report['provenance'],RANKING_PROVENANCE_KEYS,'ranking provenance')
+    if provenance['scanner_version']!='3.0.1' or not re.fullmatch(r'[0-9a-f]{40}',provenance['scanner_source_commit']) or not re.fullmatch(r'sha256:[0-9a-f]{64}',provenance['ruleset_digest']):fail('invalid ranking provenance')
+    publication=exact(report['publication'],RANKING_PUBLICATION_KEYS,'ranking publication')
+    if publication!={'purpose':'POPULARITY_COHORT_SCAN_COVERAGE','security_ranking':False,'raw_findings':'NOT_PUBLISHED','firewall_results':'NOT_PUBLISHED'}:fail('invalid ranking publication boundary')
+    entries=report['entries']
+    if not isinstance(entries,list) or len(entries)!=15:fail('ranking requires exactly fifteen entries')
+    previous_stars=None;names=[]
+    for expected_rank,entry in enumerate(entries,1):
+        entry=exact(entry,RANKING_ENTRY_KEYS,'ranking entry')
+        if entry['rank']!=expected_rank or type(entry['stars']) is not int or entry['stars']<0:fail('invalid ranking order or stars')
+        if previous_stars is not None and entry['stars']>previous_stars:fail('ranking is not sorted by stars')
+        previous_stars=entry['stars'];repository=entry['repository']
+        if type(repository) is not str or not re.fullmatch(r'[A-Za-z0-9_.-]{1,39}/[A-Za-z0-9_.-]{1,100}',repository):fail('invalid ranking repository')
+        if entry['repository_url']!=f'https://github.com/{repository}' or not re.fullmatch(r'[0-9a-f]{40}',entry['head_sha']):fail('ranking repository identity mismatch')
+        license_spdx=entry['license_spdx']
+        if license_spdx is not None and (type(license_spdx) is not str or not re.fullmatch(r'[A-Za-z0-9.+-]{1,100}',license_spdx) or license_spdx in {'NONE','NOASSERTION'}):fail('invalid ranking license')
+        if entry['scan_status'] not in RANKING_SCAN_STATUSES or entry['publication_status'] not in RANKING_PUBLICATION_STATUSES:fail('invalid ranking scan status')
+        names.append(repository.casefold())
+    if len(set(names))!=15 or report['limitations']!=RANKING_LIMITATIONS:fail('invalid ranking limitations or duplicate repositories')
+    if html_raw!=render_ranking_html(report):fail('ranking HTML is not exact deterministic rendering')
+    return report
+
 def validate_weekly_report(raw,html_raw,expected_week):
     if len(raw)>8_192 or len(html_raw)>16_384:fail('oversized weekly artifact')
     report=exact(strict_json(raw),WEEKLY_REPORT_KEYS,'weekly report')
@@ -234,12 +284,15 @@ def verify(root:Path)->dict:
     if request_raw is None:raise VerificationError('missing pr-request.json')
     request=strict_json(request_raw)
     if request_raw!=canonical(request):fail('request JSON is not canonical')
-    request_schema=request.get('schema');weekly_reports=[]
+    request_schema=request.get('schema');weekly_reports=[];ranking_reports=[]
     if request_schema=='coderisktools.observatory.pr-request.v3':
         exact(request,REQUEST_KEYS,'request')
     elif request_schema=='coderisktools.observatory.pr-request.v4':
         exact(request,REQUEST_V4_KEYS,'request');weekly_reports=request['weekly_reports']
         if not isinstance(weekly_reports,list) or not weekly_reports or len(weekly_reports)>520:fail('invalid weekly request array')
+    elif request_schema=='coderisktools.observatory.pr-request.v5':
+        exact(request,REQUEST_V5_KEYS,'request');weekly_reports=request['weekly_reports'];ranking_reports=request['ranking_reports']
+        if not isinstance(weekly_reports,list) or len(weekly_reports)>520 or not isinstance(ranking_reports,list) or len(ranking_reports)>52:fail('invalid weekly or ranking request arrays')
     else:fail('unsupported request identity')
     if request['base']!='main':fail('unsupported request base')
     if request['public_tree_manifest_path']!='SHA256SUMS.txt' or request['public_tree_manifest_sha256']!=sha(manifest) or request['public_tree_file_count']!=len(public_files):fail('public tree request binding mismatch')
@@ -322,7 +375,7 @@ def verify(root:Path)->dict:
             key=current[(owner,repository)][1];prefix=f'reports/github/{owner}/{repository}/{key[2]}/r{key[3]}/';firewall=strict_json(public_files[prefix+'firewall-decision.json']);label='Reviewed' if firewall.get('status') in {'FIREWALL_ALLOW','FIREWALL_SIMULATION_ALLOW'} else 'Report available'
         if public_files.get(badge_name)!=badge(label):fail('badge semantic mismatch')
     weekly_entries=[];previous_week=''
-    if weekly_reports:
+    if weekly_reports and not ranking_reports:
         newest_binding=weekly_reports[-1]
         if not isinstance(newest_binding,dict) or request['branch']!=f"weekly/{newest_binding.get('week')}":fail('weekly request branch is not bound to newest week')
     for binding in weekly_reports:
@@ -333,6 +386,22 @@ def verify(root:Path)->dict:
         if report_raw is None or html_raw is None:raise VerificationError('weekly public artifact missing')
         if sha(report_raw)!=hex64(binding['report_sha256'],'weekly report digest') or sha(html_raw)!=hex64(binding['html_sha256'],'weekly HTML digest'):fail('weekly public digest mismatch')
         validate_weekly_report(report_raw,html_raw,week);expected_public.update({report_name,html_name});weekly_entries.append({'week':week,'report_path':f'/weekly/{week}/'})
+    ranking_entries=[];previous_ranking_week=''
+    if ranking_reports:
+        newest_ranking=ranking_reports[-1]
+        if not isinstance(newest_ranking,dict) or request['branch']!=f"ranking/{newest_ranking.get('week')}":fail('ranking request branch is not bound to newest week')
+    for binding in ranking_reports:
+        exact(binding,RANKING_BINDING_KEYS,'ranking binding');week=binding['week'];iso_week(week)
+        if previous_ranking_week and week<=previous_ranking_week:fail('ranking bindings must be unique and sorted')
+        previous_ranking_week=week
+        report_name=f'rankings/{week}/report.json';html_name=f'rankings/{week}/index.html';report_raw=public_files.get(report_name);html_raw=public_files.get(html_name)
+        if report_raw is None or html_raw is None:fail('ranking public artifact missing')
+        if sha(report_raw)!=hex64(binding['report_sha256'],'ranking report digest') or sha(html_raw)!=hex64(binding['html_sha256'],'ranking HTML digest'):fail('ranking public digest mismatch')
+        report=validate_ranking_report(report_raw,html_raw);expected_public.update({report_name,html_name});ranking_entries.append({'week':week,'report_path':f'/rankings/{week}/'})
+    if ranking_entries:
+        ranking_entries.reverse();index_name='rankings/index.json';latest_name='rankings/latest.json';expected_public.update({index_name,latest_name})
+        if public_files.get(index_name)!=canonical({'schema':'coderisktools.observatory.popularity-ranking-index.v1','reports':ranking_entries}):fail('ranking index semantic mismatch')
+        if public_files.get(latest_name)!=canonical(ranking_entries[0]):fail('ranking latest semantic mismatch')
     if weekly_entries:
         weekly_entries.reverse();index_name='weekly/index.json';latest_name='weekly/latest.json';expected_public.update({index_name,latest_name})
         if public_files.get(index_name)!=canonical({'schema':'coderisktools.observatory.named-weekly-index.v1','reports':weekly_entries}):fail('weekly index semantic mismatch')

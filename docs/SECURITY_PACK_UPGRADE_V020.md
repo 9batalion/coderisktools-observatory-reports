@@ -1,8 +1,8 @@
-# Controlled security-pack bootstrap — v0.2.0
+# Controlled security-pack bootstrap — v0.3.0 ranking contract
 
 ## Why this is out-of-band once
 
-Protected `main` currently trusts GitHub-next v0.1.2. That trusted base intentionally permits report PR changes only under `public/` and `operator/`; it does not contain the weekly verifier scripts. Therefore v0.2.0 cannot truthfully validate itself through the report-only gate. Treating candidate scripts as trusted would be circular.
+Protected `main` currently trusts the existing weekly verifier. A ranking contract changes the trusted verifier, so it cannot truthfully validate itself through the normal report-only gate. This controlled bootstrap changes only the ranking verifier/schema/test surface; it never grants a report payload permission to update its own verifier.
 
 This document defines a one-time, controlled administrative bootstrap. It never grants a report workflow permission to update its own verifier.
 
@@ -26,7 +26,7 @@ The bootstrap may change only the exact allowlist encoded in `scripts/verify_sec
    - normal and `python -O` suites;
    - deterministic builder comparison;
    - independent read-only audit requiring `PASS B0/H0/M0`.
-5. Create branch `security-pack/v0.2.0` containing one exact reviewed commit and open one administrative PR.
+5. Create branch `security-pack/v0.3.0` containing one exact reviewed commit and open one administrative PR.
 6. Re-fetch the PR head and prove it equals the frozen reviewed commit. Do not use a mutable local branch as evidence.
 
 ## Controlled merge window
@@ -35,7 +35,7 @@ The existing required `validate` check will fail by design because v0.1.2 reject
 
 1. Keep required PR, linear history, enforce-admins, conversation resolution, no-force-push and no-deletion controls enabled.
 2. Temporarily remove only the required status-check entry after all preconditions pass and the exact PR head is frozen.
-3. Merge only the frozen `security-pack/v0.2.0` PR by expected head OID.
+3. Merge only the frozen `security-pack/v0.3.0` PR by expected head OID.
 4. Immediately restore strict required check `validate` bound to GitHub Actions App ID `15368`.
 5. If merge or restoration fails, stop all publication work and restore branch protection before any other action.
 6. Verify branch protection by authenticated read-back and confirm zero unexpected open PRs.

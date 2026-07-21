@@ -5,8 +5,9 @@ Public Reports repository for CodeRiskTools Observatory, operated in **solo-main
 ## Current state
 
 - Security/workflow baseline: independently audited GitHub-next v0.1.2.
-- Weekly-next candidate: v0.2.0 Named Weekly OSS Review, local implementation pending adversarial audit and remote promotion.
-- Named weekly pages intentionally publish exactly three reviewed project names, official GitHub links and SPDX licenses for editorial discovery; technical findings and exact results remain private.
+- Weekly-next candidate: v0.2.0 Named Weekly OSS Review plus popularity cohort contract, local implementation pending controlled security-pack promotion.
+- Named weekly pages intentionally publish exactly three reviewed project names; technical findings and exact results remain private.
+- Popularity cohort pages publish only stars ordering, exact target SHA, bounded scan status, and provenance; they are not security rankings.
 - Exact local source-inventory manifest: `0b5e5dd21533c8ef0c69345b0dc75455b94716ac50162369e431aff898d3cb33` (the remote repository is a deployment projection, not that inventory).
 - Synthetic publication set: deployed from PR #1.
 - Real reports published: **none**.

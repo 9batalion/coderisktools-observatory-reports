@@ -12,16 +12,13 @@ import sys
 
 ALLOWED={
  '.github/workflows/validate-publication.yml','README.md','pyproject.toml','run_state.json','governance/repository-policy.json',
- 'docs/NAMED_WEEKLY_OSS_REVIEW_V1.md','docs/SECURITY_PACK_UPGRADE_V020.md',
- 'schemas/named-weekly-index.v1.schema.json','schemas/named-weekly-review.v1.schema.json','schemas/private-weekly-trial.v1.schema.json',
+ 'docs/NAMED_WEEKLY_OSS_REVIEW_V1.md','docs/SECURITY_PACK_UPGRADE_V020.md','docs/POPULARITY_RANKING_V1.md',
+ 'schemas/named-weekly-index.v1.schema.json','schemas/named-weekly-review.v1.schema.json','schemas/private-weekly-trial.v1.schema.json','schemas/popularity-ranking.v1.schema.json',
  'scripts/build_named_weekly.py','scripts/verify_release_repo.py','scripts/verify_security_pack_upgrade.py','scripts/verify_weekly_immutability.py','scripts/verify_weekly_pr_metadata.py',
- 'tests/test_named_weekly_builder.py','tests/test_named_weekly_reviews.py',
+ 'tests/test_named_weekly_builder.py','tests/test_named_weekly_reviews.py','tests/test_popularity_ranking.py',
 }
 REQUIRED_NEW={
- 'docs/NAMED_WEEKLY_OSS_REVIEW_V1.md','docs/SECURITY_PACK_UPGRADE_V020.md','run_state.json',
- 'schemas/named-weekly-index.v1.schema.json','schemas/named-weekly-review.v1.schema.json','schemas/private-weekly-trial.v1.schema.json',
- 'scripts/build_named_weekly.py','scripts/verify_security_pack_upgrade.py','scripts/verify_weekly_immutability.py','scripts/verify_weekly_pr_metadata.py',
- 'tests/test_named_weekly_builder.py','tests/test_named_weekly_reviews.py',
+ 'docs/POPULARITY_RANKING_V1.md','schemas/popularity-ranking.v1.schema.json','tests/test_popularity_ranking.py',
 }
 IGNORE={'.git','__pycache__','.pytest_cache'}
 def fail(message):raise ValueError(message)
@@ -58,14 +55,14 @@ def main(argv=None):
         if deleted:fail(f'security-pack bootstrap deleted files: {sorted(deleted)}')
         if not REQUIRED_NEW<=changed or not changed<=ALLOWED:fail(f'non-exact security-pack change set: {sorted(changed)}')
         state=json.loads(candidate_files['run_state.json']);
-        if state.get('version')!='0.2.0' or state.get('remote_promoted') is not False:fail('candidate state is not unpromoted v0.2.0')
+        if state.get('version')!='0.3.0' or state.get('remote_promoted') is not False:fail('candidate state is not unpromoted v0.3.0')
         workflow=candidate_files['.github/workflows/validate-publication.yml'].decode()
         for token in ('trusted/scripts/verify_weekly_pr_metadata.py','trusted/scripts/verify_weekly_immutability.py','trusted/scripts/verify_release_repo.py','github.event.pull_request.head.sha'):
             if token not in workflow:fail(f'candidate workflow lacks trusted token: {token}')
         verification=run([sys.executable,'scripts/verify_release_repo.py','--root','.'],candidate)
         if args.run_tests:
             run([sys.executable,'-m','unittest','discover','-s','tests','-q'],candidate);run([sys.executable,'-O','-m','unittest','discover','-s','tests','-q'],candidate)
-        print(json.dumps({'status':'SECURITY_PACK_UPGRADE_OK','version':'0.2.0','changed_paths':sorted(changed),'changed_count':len(changed),'candidate_inventory_sha256':digest(b''.join(name.encode()+b'\0'+digest(candidate_files[name]).encode()+b'\n' for name in sorted(candidate_files))),'release_verification':verification},sort_keys=True,separators=(',',':')));return 0
+        print(json.dumps({'status':'SECURITY_PACK_UPGRADE_OK','version':'0.3.0','changed_paths':sorted(changed),'changed_count':len(changed),'candidate_inventory_sha256':digest(b''.join(name.encode()+b'\0'+digest(candidate_files[name]).encode()+b'\n' for name in sorted(candidate_files))),'release_verification':verification},sort_keys=True,separators=(',',':')));return 0
     except (OSError,UnicodeDecodeError,ValueError,json.JSONDecodeError) as exc:
         print(f'SECURITY_PACK_UPGRADE_FAILED: {exc}',file=sys.stderr);return 2
 if __name__=='__main__':raise SystemExit(main())
