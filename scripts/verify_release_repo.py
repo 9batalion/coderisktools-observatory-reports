@@ -23,7 +23,7 @@ REQUEST_V5_KEYS=REQUEST_V4_KEYS|{'ranking_reports'}
 RANKING_BINDING_KEYS={'week','report_sha256','html_sha256'}
 RANKING_KEYS={'schema','week','cohort','provenance','publication','entries','limitations'}
 RANKING_COHORT_KEYS={'schema','metric','snapshot_at','tie_break','size'}
-RANKING_PROVENANCE_KEYS={'scanner_version','scanner_source_commit','ruleset_digest'}
+RANKING_PROVENANCE_KEYS={'scanner_version','scanner_source_commit'}
 RANKING_PUBLICATION_KEYS={'purpose','security_ranking','raw_findings','firewall_results'}
 RANKING_ENTRY_KEYS={'rank','repository','repository_url','head_sha','stars','license_spdx','scan_status','publication_status'}
 RANKING_SCAN_STATUSES={'complete','partial'}
@@ -175,7 +175,7 @@ def validate_ranking_report(raw,html_raw):
     if cohort['schema']!='coderisktools.public-popularity-cohort.v1' or cohort['metric']!='stargazers_count' or cohort['tie_break']!='repository lexicographic ascending' or cohort['size']!=15:fail('invalid ranking cohort')
     utc(cohort['snapshot_at'],'ranking snapshot')
     provenance=exact(report['provenance'],RANKING_PROVENANCE_KEYS,'ranking provenance')
-    if provenance['scanner_version']!='3.0.1' or not re.fullmatch(r'[0-9a-f]{40}',provenance['scanner_source_commit']) or not re.fullmatch(r'sha256:[0-9a-f]{64}',provenance['ruleset_digest']):fail('invalid ranking provenance')
+    if provenance['scanner_version']!='3.1.1' or not re.fullmatch(r'[0-9a-f]{40}',provenance['scanner_source_commit']):fail('invalid ranking provenance')
     publication=exact(report['publication'],RANKING_PUBLICATION_KEYS,'ranking publication')
     if publication!={'purpose':'POPULARITY_COHORT_SCAN_COVERAGE','security_ranking':False,'raw_findings':'NOT_PUBLISHED','firewall_results':'NOT_PUBLISHED'}:fail('invalid ranking publication boundary')
     entries=report['entries']
@@ -396,8 +396,11 @@ def verify(root:Path)->dict:
         previous_ranking_week=week
         report_name=f'rankings/{week}/report.json';html_name=f'rankings/{week}/index.html';report_raw=public_files.get(report_name);html_raw=public_files.get(html_name)
         if report_raw is None or html_raw is None:fail('ranking public artifact missing')
+        assert report_raw is not None and html_raw is not None
         if sha(report_raw)!=hex64(binding['report_sha256'],'ranking report digest') or sha(html_raw)!=hex64(binding['html_sha256'],'ranking HTML digest'):fail('ranking public digest mismatch')
-        report=validate_ranking_report(report_raw,html_raw);expected_public.update({report_name,html_name});ranking_entries.append({'week':week,'report_path':f'/rankings/{week}/'})
+        report=validate_ranking_report(report_raw,html_raw);checks_name=f'rankings/{week}/checksums.txt';expected_checks=f'{sha(html_raw)}  index.html\n{sha(report_raw)}  report.json\n'.encode();
+        if public_files.get(checks_name)!=expected_checks:fail('ranking checksums mismatch')
+        expected_public.update({report_name,html_name,checks_name});ranking_entries.append({'week':week,'report_path':f'/rankings/{week}/'})
     if ranking_entries:
         ranking_entries.reverse();index_name='rankings/index.json';latest_name='rankings/latest.json';expected_public.update({index_name,latest_name})
         if public_files.get(index_name)!=canonical({'schema':'coderisktools.observatory.popularity-ranking-index.v1','reports':ranking_entries}):fail('ranking index semantic mismatch')

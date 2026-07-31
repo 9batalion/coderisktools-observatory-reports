@@ -36,9 +36,8 @@ def valid_ranking():
             'size': 15,
         },
         'provenance': {
-            'scanner_version': '3.0.1',
-            'scanner_source_commit': '1c45de48edf1a36d3fda332ffa5e59da9fcd4631',
-            'ruleset_digest': 'sha256:1d90a16900f6b3aff1f11ce31b05a8b72a4257049903063e284b8a1cdc69d6ee',
+            'scanner_version': '3.1.1',
+            'scanner_source_commit': '347511c70425b52b8ba794e0e68e659f23ced13f',
         },
         'publication': {
             'purpose': 'POPULARITY_COHORT_SCAN_COVERAGE',
