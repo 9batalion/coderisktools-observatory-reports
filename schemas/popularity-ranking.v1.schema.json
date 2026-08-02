@@ -24,7 +24,7 @@
       "type": "object", "additionalProperties": false,
       "required": ["scanner_version", "scanner_source_commit"],
       "properties": {
-        "scanner_version": {"const": "3.1.1"},
+        "scanner_version": {"const": "3.1.3"},
         "scanner_source_commit": {"type": "string", "pattern": "^[0-9a-f]{40}$"}
       }
     },
@@ -52,7 +52,7 @@
 
           "stars": {"type": "integer", "minimum": 0},
           "license_spdx": {"type": ["string", "null"]},
-          "scan_status": {"enum": ["complete", "partial"]},
+          "scan_status": {"enum": ["complete", "partial", "blocked"]},
           "publication_status": {"const": "NOT_PUBLISHED"}
         }
       }

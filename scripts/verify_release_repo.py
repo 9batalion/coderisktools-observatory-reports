@@ -26,7 +26,7 @@ RANKING_COHORT_KEYS={'schema','metric','snapshot_at','tie_break','size'}
 RANKING_PROVENANCE_KEYS={'scanner_version','scanner_source_commit'}
 RANKING_PUBLICATION_KEYS={'purpose','security_ranking','raw_findings','firewall_results'}
 RANKING_ENTRY_KEYS={'rank','repository','repository_url','head_sha','stars','license_spdx','scan_status','publication_status'}
-RANKING_SCAN_STATUSES={'complete','partial'}
+RANKING_SCAN_STATUSES={'complete','partial','blocked'}
 RANKING_PUBLICATION_STATUSES={'NOT_PUBLISHED'}
 RANKING_LIMITATIONS=[
     'This is a popularity cohort and scan-coverage index, not a security ranking.',
@@ -175,7 +175,7 @@ def validate_ranking_report(raw,html_raw):
     if cohort['schema']!='coderisktools.public-popularity-cohort.v1' or cohort['metric']!='stargazers_count' or cohort['tie_break']!='repository lexicographic ascending' or cohort['size']!=15:fail('invalid ranking cohort')
     utc(cohort['snapshot_at'],'ranking snapshot')
     provenance=exact(report['provenance'],RANKING_PROVENANCE_KEYS,'ranking provenance')
-    if provenance['scanner_version']!='3.1.1' or not re.fullmatch(r'[0-9a-f]{40}',provenance['scanner_source_commit']):fail('invalid ranking provenance')
+    if provenance['scanner_version']!='3.1.3' or not re.fullmatch(r'[0-9a-f]{40}',provenance['scanner_source_commit']):fail('invalid ranking provenance')
     publication=exact(report['publication'],RANKING_PUBLICATION_KEYS,'ranking publication')
     if publication!={'purpose':'POPULARITY_COHORT_SCAN_COVERAGE','security_ranking':False,'raw_findings':'NOT_PUBLISHED','firewall_results':'NOT_PUBLISHED'}:fail('invalid ranking publication boundary')
     entries=report['entries']
