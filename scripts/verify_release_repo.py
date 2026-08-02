@@ -26,12 +26,16 @@ RANKING_COHORT_KEYS={'schema','metric','snapshot_at','tie_break','size'}
 RANKING_PROVENANCE_KEYS={'scanner_version','scanner_source_commit'}
 RANKING_PUBLICATION_KEYS={'purpose','security_ranking','raw_findings','firewall_results'}
 RANKING_ENTRY_KEYS={'rank','repository','repository_url','head_sha','stars','license_spdx','scan_status','publication_status'}
+RANKING_OBSERVATION_KEYS={'critical','high','medium','low','total'}
 RANKING_SCAN_STATUSES={'complete','partial','blocked'}
 RANKING_PUBLICATION_STATUSES={'NOT_PUBLISHED'}
-RANKING_LIMITATIONS=[
+RANKING_LIMITATIONS_LEGACY=[
     'This is a popularity cohort and scan-coverage index, not a security ranking.',
     'Partial or failed scans are not interpreted as clean or vulnerable.',
     'Raw findings, paths, snippets, secrets, scores, grades, and firewall results are not published.',
+]
+RANKING_LIMITATIONS=RANKING_LIMITATIONS_LEGACY+[
+    'Severity counts are rule observations in the tested scope, not confirmed vulnerabilities or a security ranking.',
 ]
 WEEKLY_BINDING_KEYS={'week','report_sha256','html_sha256'}
 WEEKLY_REPORT_KEYS={'schema','week','period','projects','engines','isolation','publication','result','limitations'}
@@ -160,8 +164,16 @@ def calendar_date(value,label):
     if type(value) is not str or not re.fullmatch(r'\d{4}-\d{2}-\d{2}',value):fail(f'invalid {label}')
     try:return date.fromisoformat(value)
     except ValueError:fail(f'invalid {label}')
+def ranking_observation_label(entry):
+    counts=entry.get('observation_counts')
+    if counts is None:return 'not available'
+    return ', '.join(f'{key}={counts[key]}' for key in ('critical','high','medium','low'))
+def ranking_entry_html(entry):
+    base=f'<li><strong>#{entry["rank"]}</strong> <a href="{html.escape(entry["repository_url"],quote=True)}" rel="noopener noreferrer">{html.escape(entry["repository"])}</a> — {entry["stars"]} stars — scan {entry["scan_status"]}'
+    if 'observation_counts' not in entry:return base+'</li>'
+    return base+f' — observations {html.escape(ranking_observation_label(entry))}</li>'
 def render_ranking_html(report):
-    entries=''.join(f'<li><strong>#{entry["rank"]}</strong> <a href="{html.escape(entry["repository_url"],quote=True)}" rel="noopener noreferrer">{html.escape(entry["repository"])}</a> — {entry["stars"]} stars — scan {entry["scan_status"]}</li>' for entry in report['entries'])
+    entries=''.join(ranking_entry_html(entry) for entry in report['entries'])
     limitations=''.join(f'<li>{html.escape(item)}</li>' for item in report['limitations'])
     return f"<!doctype html><html><head><meta charset=\"utf-8\"><meta http-equiv=\"Content-Security-Policy\" content=\"default-src 'none'; style-src 'self'; img-src 'self'; base-uri 'none'; form-action 'none'\"><meta name=\"description\" content=\"Popularity cohort and scan coverage index; not a security ranking.\"><title>CodeRiskTools Popularity Cohort — {report['week']}</title></head><body><h1>CodeRiskTools Popularity Cohort — {report['week']}</h1><p>This is a popularity cohort and scan-coverage index, not a security ranking.</p><ol>{entries}</ol><h2>Limitations</h2><ul>{limitations}</ul></body></html>".encode()
 
@@ -182,7 +194,11 @@ def validate_ranking_report(raw,html_raw):
     if not isinstance(entries,list) or len(entries)!=15:fail('ranking requires exactly fifteen entries')
     previous_stars=None;names=[]
     for expected_rank,entry in enumerate(entries,1):
-        entry=exact(entry,RANKING_ENTRY_KEYS,'ranking entry')
+        entry=exact(entry,RANKING_ENTRY_KEYS|({'observation_counts'} if 'observation_counts' in entry else set()),'ranking entry')
+        counts=entry.get('observation_counts')
+        if counts is not None:
+            counts=exact(counts,RANKING_OBSERVATION_KEYS,'ranking observation counts')
+            if any(type(counts[key]) is not int or counts[key]<0 for key in RANKING_OBSERVATION_KEYS) or counts['total']!=sum(counts[key] for key in ('critical','high','medium','low')):fail('invalid ranking observation counts')
         if entry['rank']!=expected_rank or type(entry['stars']) is not int or entry['stars']<0:fail('invalid ranking order or stars')
         if previous_stars is not None and entry['stars']>previous_stars:fail('ranking is not sorted by stars')
         previous_stars=entry['stars'];repository=entry['repository']
@@ -192,7 +208,7 @@ def validate_ranking_report(raw,html_raw):
         if license_spdx is not None and (type(license_spdx) is not str or not re.fullmatch(r'[A-Za-z0-9.+-]{1,100}',license_spdx) or license_spdx in {'NONE','NOASSERTION'}):fail('invalid ranking license')
         if entry['scan_status'] not in RANKING_SCAN_STATUSES or entry['publication_status'] not in RANKING_PUBLICATION_STATUSES:fail('invalid ranking scan status')
         names.append(repository.casefold())
-    if len(set(names))!=15 or report['limitations']!=RANKING_LIMITATIONS:fail('invalid ranking limitations or duplicate repositories')
+    if len(set(names))!=15 or report['limitations'] not in (RANKING_LIMITATIONS_LEGACY,RANKING_LIMITATIONS):fail('invalid ranking limitations or duplicate repositories')
     if html_raw!=render_ranking_html(report):fail('ranking HTML is not exact deterministic rendering')
     return report
 

@@ -20,6 +20,7 @@ def ranking_entry(rank, name, sha, stars, scan_status='partial', publication_sta
         'license_spdx': 'MIT',
         'scan_status': scan_status,
         'publication_status': publication_status,
+        'observation_counts': {'critical': 0, 'high': 0, 'medium': 0, 'low': 0, 'total': 0},
     }
 
 
@@ -50,6 +51,7 @@ def valid_ranking():
             'This is a popularity cohort and scan-coverage index, not a security ranking.',
             'Partial or failed scans are not interpreted as clean or vulnerable.',
             'Raw findings, paths, snippets, secrets, scores, grades, and firewall results are not published.',
+            'Severity counts are rule observations in the tested scope, not confirmed vulnerabilities or a security ranking.',
         ],
     }
 
